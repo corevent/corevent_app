@@ -46,6 +46,7 @@ android {
 
     defaultConfig {
         applicationId = "com.corevent.coreventapp"
+        manifestPlaceholders["appLabel"] = "Corevent"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -67,10 +68,12 @@ android {
         create("development") {
             dimension = "environment"
             applicationIdSuffix = ".development"
+            manifestPlaceholders["appLabel"] = "dev-Corevent"
         }
         create("integration") {
             dimension = "environment"
             applicationIdSuffix = ".integration"
+            manifestPlaceholders["appLabel"] = "dev-Corevent"
         }
     }
 

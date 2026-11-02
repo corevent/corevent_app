@@ -6,11 +6,21 @@ Aplicativo Flutter para descobrir eventos, comprar ingressos e gerenciar compras
 
 - Android.
 
-Identificadores Android por flavor:
+Nomes exibidos e identificadores Android por flavor:
 
-- Produção: `com.corevent.coreventapp`.
-- Desenvolvimento: `com.corevent.coreventapp.development`.
-- Integração: `com.corevent.coreventapp.integration`.
+| Flavor | Nome no Android | Application ID |
+| --- | --- | --- |
+| `production` | Corevent | `com.corevent.coreventapp` |
+| `development` | dev-Corevent | `com.corevent.coreventapp.development` |
+| `integration` | dev-Corevent | `com.corevent.coreventapp.integration` |
+
+O prefixo `dev-` identifica as instalações de desenvolvimento/staging e de
+integração, tanto em debug quanto em release. O nome é definido pelo flavor;
+a API continua sendo selecionada por `COREVENT_API_URL` na compilação. Para staging:
+
+```sh
+flutter run --flavor development --dart-define=COREVENT_API_URL=https://corevent-staging-api-666040325433.us-central1.run.app
+```
 
 ## Pré-requisitos
 
