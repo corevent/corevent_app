@@ -32,7 +32,7 @@ def write_private(path, content):
 def prepare_signing(workspace, temporary, secrets):
     missing = [name for name in SECRET_NAMES if not secrets.get(name, "").strip()]
     if missing:
-        raise ValueError("Missing production secrets: " + ", ".join(missing))
+        raise ValueError("Missing Android signing secrets: " + ", ".join(missing))
 
     encoded = "".join(secrets["ANDROID_KEYSTORE_BASE64"].split())
     try:

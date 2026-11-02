@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: development-apk
@@ -16,16 +17,29 @@ jobs:
   publish:
     if: github.ref == 'refs/heads/develop'
     name: Publish development APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: staging
     env:
       COREVENT_API_URL: ${{ vars.COREVENT_API_URL }}
+      APK_APP: app
+      APK_ENVIRONMENT: staging
+      APK_GCP_PROJECT_ID: ${{ vars.APK_GCP_PROJECT_ID }}
+      APK_GCS_BUCKET: ${{ vars.APK_GCS_BUCKET }}
+      APK_MIN_VERSION_CODE: ${{ vars.APK_MIN_VERSION_CODE || '0' }}
+      APK_GCP_WIF_PROVIDER: ${{ vars.APK_GCP_WIF_PROVIDER }}
+      APK_GCP_SERVICE_ACCOUNT: ${{ vars.APK_GCP_SERVICE_ACCOUNT }}
+      ANDROID_BUILD_TOOLS: '36.0.0'
     steps:
       - uses: actions/checkout@v6
       - name: Validate staging API
         run: |
           [[ "$COREVENT_API_URL" == https://* ]] || { echo '::error::Configure COREVENT_API_URL in the staging Environment'; exit 1; }
+      - name: Validate APK publication configuration
+        run: |
+          for key in APK_GCP_PROJECT_ID APK_GCS_BUCKET APK_GCP_WIF_PROVIDER APK_GCP_SERVICE_ACCOUNT; do
+            [[ -n "${!key}" ]] || { echo "::error::Missing configuration: $key"; exit 1; }
+          done
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -36,31 +50,57 @@ jobs:
           channel: stable
           cache: true
       - uses: gradle/actions/setup-gradle@v5
+      - name: Prepare Android SDK and NDK
+        shell: bash
+        run: bash .github/scripts/prepare_android_sdk.sh
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter analyze
       - run: flutter test test --no-pub
+      - name: Prepare staging signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: python3 .github/scripts/prepare_android_signing.py
       - name: Build development APK
         run: |
-          flutter build apk --debug --flavor development --no-pub \
+          flutter build apk --release --flavor development --no-pub \
             --build-number="$GITHUB_RUN_NUMBER" \
             --dart-define="COREVENT_API_URL=$COREVENT_API_URL"
       - name: Package APK and checksum
         run: |
           mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-development-debug.apk dist/corevent-development.apk
+          cp build/app/outputs/flutter-apk/app-development-release.apk dist/corevent-development.apk
           cd dist
           sha256sum corevent-development.apk > corevent-development.apk.sha256
+      - name: Authenticate APK publisher
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.APK_GCP_WIF_PROVIDER }}
+          service_account: ${{ env.APK_GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ env.APK_GCP_PROJECT_ID }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Validate and publish APK to private bucket
+        env:
+          APK_FILE: build/app/outputs/flutter-apk/app-development-release.apk
+          APK_EXPECTED_VERSION_CODE: ${{ github.run_number }}
+        run: python3 .github/scripts/publish_apk.py
       - name: Publish development pre-release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           tag="dev-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
-          printf 'APK de desenvolvimento conectado à API staging.\n\nCommit: %s\nModo: debug\nApplication ID: com.corevent.coreventapp.development\n' "$GITHUB_SHA" > "$RUNNER_TEMP/development-notes.md"
+          printf 'APK de desenvolvimento conectado à API staging.\n\nCommit: %s\nModo: release\nApplication ID: com.corevent.coreventapp.development\n' "$GITHUB_SHA" > "$RUNNER_TEMP/development-notes.md"
           gh release create "$tag" \
             dist/corevent-development.apk \
             dist/corevent-development.apk.sha256 \
             --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "Development build ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
             --notes-file "$RUNNER_TEMP/development-notes.md"
+      - name: Remove staging signing files
+        if: always()
+        shell: bash
+        run: rm -f android/key.properties "$RUNNER_TEMP/android-release-keystore.jks"
