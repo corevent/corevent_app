@@ -22,6 +22,26 @@ def execute(arguments):
     return subprocess.run(arguments, check=True, text=True, capture_output=True, timeout=300).stdout
 
 
+def command_failure(error):
+    # Only describe the tool/subcommand, never its arguments or credential file.
+    arguments = [Path(error.cmd[0]).name, *error.cmd[1:]]
+    known_commands = [('gcloud', 'storage', 'objects', 'describe'),
+                      ('gcloud', 'storage', 'cat'), ('gcloud', 'storage', 'cp'),
+                      ('apksigner', 'verify'), ('aapt', 'dump', 'badging')]
+    command = next((' '.join(prefix) for prefix in known_commands
+                    if arguments[:len(prefix)] == list(prefix)), arguments[0])
+    detail = error.stderr or error.stdout or 'No diagnostic output.'
+    detail = re.sub(r'-----BEGIN [^-]+-----.*?-----END [^-]+-----', '[REDACTED KEY]', detail, flags=re.S)
+    detail = re.sub(r'(?i)https?://[^\s<>\"\']+', '[REDACTED URL]', detail)
+    detail = re.sub(r'(?i)Bearer\s+\S+', 'Bearer [REDACTED]', detail)
+    detail = re.sub(r'(?i)([\"\']?(?:access_token|refresh_token|id_token|client_secret|private_key|subject_token|token)[\"\']?\s*[:=]\s*)[\"\']?[^\s,\"\'}]+', r'\1[REDACTED]', detail)
+    detail = re.sub(r'\b(?:eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|ya29\.[A-Za-z0-9._-]+)\b', '[REDACTED TOKEN]', detail)
+    # Prevent diagnostic output from being interpreted as workflow commands.
+    detail = detail.replace('::', ': :').replace('##[', '# #[')
+    detail = '\n'.join('  ' + line for line in detail[:4000].splitlines())
+    return f'APK publication command failed: {command} (exit {error.returncode}).\n{detail}'
+
+
 class Storage:
     def __init__(self, project, bucket):
         self.project = project
@@ -145,7 +165,9 @@ def metadata(apk, env):
 
 def main():
     apk = Path(os.environ['APK_FILE'])
+    print('Validating APK signature, package and version.', flush=True)
     release = metadata(apk, os.environ)
+    print('Publishing verified APK and manifests to private storage.', flush=True)
     changed = publish(Storage(os.environ['APK_GCP_PROJECT_ID'], os.environ['APK_GCS_BUCKET']),
                       apk, release, Path('dist/publication'))
     print(json.dumps({'published': changed, 'app': release['app'],
@@ -156,8 +178,7 @@ if __name__ == '__main__':
     try:
         main()
     except subprocess.CalledProcessError as error:
-        # Authentication material and signed URLs must not be printed.
-        print(f'APK publication command failed (exit {error.returncode}).', file=sys.stderr)
+        print(command_failure(error), file=sys.stderr)
         sys.exit(1)
     except (ValueError, KeyError, OSError, subprocess.TimeoutExpired) as error:
         print(f'APK publication failed: {error}', file=sys.stderr)
