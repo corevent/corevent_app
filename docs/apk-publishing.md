@@ -76,7 +76,7 @@ bash -n .github/scripts/prepare_android_sdk.sh
 
 Esses testes usam dados fictícios e não fazem uploads reais. Testam destino,
 identidade do APK, ordem dos uploads, interrupções, proteção contra regressão,
-idempotência e promoção condicionada à geração.
+idempotência, upload multipart com metadados/checksum e promoção condicionada à geração.
 
 A primeira publicação de produção deve usar build_number maior que 2 e que
 qualquer build distribuído posteriormente. As chaves de produção existentes são
@@ -92,3 +92,13 @@ O publicador informa a fase atual e, em caso de erro, a ferramenta/subcomando,
 o código de saída e o diagnóstico com tokens, chaves e URLs HTTP removidos.
 Uma falha na configuração da autenticação pode aparecer apenas no primeiro
 acesso ao Storage; a etapa de autenticação passar não comprova o upload.
+
+O upload usa `objects.insert` da API JSON do Cloud Storage, com metadados e
+conteúdo em uma requisição multipart e precondição `ifGenerationMatch`.
+O token temporário é obtido pelo `gcloud` já autenticado e permanece apenas
+na memória do publicador. Não é necessário listar o bucket: as contas
+continuam restritas aos objetos do prefixo de cada app. O `gcloud storage cp`
+não é usado para publicação porque tenta listar destinos inexistentes para
+distinguir objetos de pastas e falha com essas permissões restritas.
+
+Referência: [Cloud Storage objects.insert](https://docs.cloud.google.com/storage/docs/json_api/v1/objects/insert).
