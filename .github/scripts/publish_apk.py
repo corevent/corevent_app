@@ -9,6 +9,10 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from urllib.error import HTTPError
+from urllib.parse import quote, urlencode
+from urllib.request import Request, urlopen
+import uuid
 
 
 TARGETS = {
@@ -22,10 +26,35 @@ def execute(arguments):
     return subprocess.run(arguments, check=True, text=True, capture_output=True, timeout=300).stdout
 
 
+def safe_diagnostic(detail):
+    detail = re.sub(r'-----BEGIN [^-]+-----.*?-----END [^-]+-----', '[REDACTED KEY]', detail, flags=re.S)
+    detail = re.sub(r'(?i)https?://[^\s<>\"\']+', '[REDACTED URL]', detail)
+    detail = re.sub(r'(?i)Bearer\s+\S+', 'Bearer [REDACTED]', detail)
+    detail = re.sub(r'(?i)([\"\']?(?:access_token|refresh_token|id_token|client_secret|private_key|subject_token|token)[\"\']?\s*[:=]\s*)[\"\']?[^\s,\"\'}]+', r'\1[REDACTED]', detail)
+    detail = re.sub(r'\b(?:eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|ya29\.[A-Za-z0-9._-]+)\b', '[REDACTED TOKEN]', detail)
+    # Prevent diagnostic output from being interpreted as workflow commands.
+    detail = detail.replace('::', ': :').replace('##[', '# #[')
+    return '\n'.join('  ' + line for line in detail[:4000].splitlines())
+
+
+def command_failure(error):
+    # Only describe the tool/subcommand, never its arguments or credential file.
+    arguments = [Path(error.cmd[0]).name, *error.cmd[1:]]
+    known_commands = [('gcloud', 'storage', 'objects', 'describe'),
+                      ('gcloud', 'storage', 'cat'), ('gcloud', 'auth', 'print-access-token'),
+                      ('apksigner', 'verify'), ('aapt', 'dump', 'badging')]
+    command = next((' '.join(prefix) for prefix in known_commands
+                    if arguments[:len(prefix)] == list(prefix)), arguments[0])
+    output = error.stderr or (error.stdout if command != 'gcloud auth print-access-token' else None)
+    detail = safe_diagnostic(output or 'No diagnostic output.')
+    return f'APK publication command failed: {command} (exit {error.returncode}).\n{detail}'
+
+
 class Storage:
     def __init__(self, project, bucket):
         self.project = project
         self.bucket = bucket
+        self._token = None
 
     def uri(self, key):
         return f'gs://{self.bucket}/{key}'
@@ -52,15 +81,38 @@ class Storage:
             if existing.get('md5_hash', existing.get('md5Hash')) == expected_md5:
                 return
             raise ValueError('An immutable release object already exists with different content')
-        command = ['gcloud', 'storage', 'cp', str(path), self.uri(key), '--project', self.project,
-                   '--if-generation-match=' + str(generation), '--quiet',
-                   '--cache-control=' + ('private,max-age=31536000' if apk else 'no-store'),
-                   '--content-type=' + ('application/vnd.android.package-archive' if apk else
-                                        'text/plain' if path.suffix == '.sha256' else 'application/json'),
-                   '--custom-metadata=sha256=' + digest]
+        content_type = ('application/vnd.android.package-archive' if apk else
+                        'text/plain' if path.suffix == '.sha256' else 'application/json')
+        object_metadata = {
+            'name': key, 'contentType': content_type, 'md5Hash': expected_md5,
+            'cacheControl': 'private,max-age=31536000' if apk else 'no-store',
+            'metadata': {'sha256': digest},
+        }
         if apk:
-            command.append('--content-disposition=attachment; filename="corevent.apk"')
-        execute(command)
+            object_metadata['contentDisposition'] = 'attachment; filename="corevent.apk"'
+        # A direct insert avoids the bucket-wide LIST used by `gcloud storage cp`
+        # to distinguish an absent destination object from a simulated folder.
+        boundary = 'corevent-' + uuid.uuid4().hex
+        body = (f'--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'.encode()
+                + json.dumps(object_metadata).encode()
+                + f'\r\n--{boundary}\r\nContent-Type: {content_type}\r\n\r\n'.encode()
+                + data + f'\r\n--{boundary}--\r\n'.encode())
+        if self._token is None:
+            self._token = execute(['gcloud', 'auth', 'print-access-token',
+                                   '--project', self.project, '--quiet']).strip()
+        query = urlencode({'uploadType': 'multipart', 'ifGenerationMatch': generation})
+        url = f'https://storage.googleapis.com/upload/storage/v1/b/{quote(self.bucket, safe="")}/o?{query}'
+        request = Request(url, data=body, method='POST', headers={
+            'Authorization': 'Bearer ' + self._token,
+            'Content-Type': 'multipart/related; boundary=' + boundary,
+        })
+        try:
+            with urlopen(request, timeout=300) as response:
+                response.read()
+        except HTTPError as error:
+            detail = error.read(16384).decode('utf-8', errors='replace')
+            raise ValueError(f'Cloud Storage upload failed (HTTP {error.code}):\n'
+                             + safe_diagnostic(detail)) from None
         uploaded = self.describe(key)
         if not uploaded or uploaded.get('md5_hash', uploaded.get('md5Hash')) != expected_md5:
             raise ValueError('Uploaded object checksum mismatch')
@@ -145,7 +197,9 @@ def metadata(apk, env):
 
 def main():
     apk = Path(os.environ['APK_FILE'])
+    print('Validating APK signature, package and version.', flush=True)
     release = metadata(apk, os.environ)
+    print('Publishing verified APK and manifests to private storage.', flush=True)
     changed = publish(Storage(os.environ['APK_GCP_PROJECT_ID'], os.environ['APK_GCS_BUCKET']),
                       apk, release, Path('dist/publication'))
     print(json.dumps({'published': changed, 'app': release['app'],
@@ -156,8 +210,7 @@ if __name__ == '__main__':
     try:
         main()
     except subprocess.CalledProcessError as error:
-        # Authentication material and signed URLs must not be printed.
-        print(f'APK publication command failed (exit {error.returncode}).', file=sys.stderr)
+        print(command_failure(error), file=sys.stderr)
         sys.exit(1)
     except (ValueError, KeyError, OSError, subprocess.TimeoutExpired) as error:
         print(f'APK publication failed: {error}', file=sys.stderr)

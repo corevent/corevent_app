@@ -32,8 +32,8 @@ Os dois Environments usam estes secrets, cada ambiente com sua chave própria:
 `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` e
 `ANDROID_KEY_PASSWORD`. Não copie a chave de produção para staging.
 
-A configuração inicial é realizada pelos scripts `ops/apk-publishing/` do
-repositório da API. O configurador de staging preserva uma chave já cadastrada.
+A autenticação usa Workload Identity Federation e uma conta publicadora por app,
+com acesso restrito ao seu prefixo no bucket. Preserve as chaves já cadastradas.
 Nenhum arquivo de chave ou credencial de nuvem deve ser commitado.
 Os APKs antigos de staging tinham assinatura de debug; na primeira migração para
 a chave fixa será necessário desinstalar essa instalação antiga. Após a migração,
@@ -58,10 +58,9 @@ confirmados. O update usa a geração anterior como precondição para evitar
 sobrescrita concorrente. Builds mais antigos não podem se tornar a versão atual.
 
 Os objetos são privados. O APK pode usar cache longo por ter caminho imutável;
-manifestos e checksums usam `no-store`. A API disponibiliza:
-
-- `GET /api/downloads/app/latest`: informações da versão no ambiente daquela API.
-- `GET /api/downloads/app`: redirecionamento com URL assinada válida por 15 minutos.
+manifestos e checksums usam `no-store`. O download privado pode ser feito
+pelo console do Cloud Storage ou por `gcloud storage cp`. A página de downloads
+e os endpoints na API não fazem parte desta implementação.
 
 Os arquivos continuam sendo publicados nas pré-releases de staging e nos
 artefatos de produção do GitHub, além do bucket. Falha no upload impede avançar
@@ -77,8 +76,29 @@ bash -n .github/scripts/prepare_android_sdk.sh
 
 Esses testes usam dados fictícios e não fazem uploads reais. Testam destino,
 identidade do APK, ordem dos uploads, interrupções, proteção contra regressão,
-idempotência e promoção condicionada à geração.
+idempotência, upload multipart com metadados/checksum e promoção condicionada à geração.
 
 A primeira publicação de produção deve usar build_number maior que 2 e que
 qualquer build distribuído posteriormente. As chaves de produção existentes são
 preservadas. A página de downloads fica para uma etapa posterior.
+
+## Diagnóstico de falhas
+
+Os builds release permitem que o Flutter regenere o registro de plugins,
+excluindo dependências de teste como `integration_test`. Não use `--no-pub`
+ao alternar de testes/debug para release.
+
+O publicador informa a fase atual e, em caso de erro, a ferramenta/subcomando,
+o código de saída e o diagnóstico com tokens, chaves e URLs HTTP removidos.
+Uma falha na configuração da autenticação pode aparecer apenas no primeiro
+acesso ao Storage; a etapa de autenticação passar não comprova o upload.
+
+O upload usa `objects.insert` da API JSON do Cloud Storage, com metadados e
+conteúdo em uma requisição multipart e precondição `ifGenerationMatch`.
+O token temporário é obtido pelo `gcloud` já autenticado e permanece apenas
+na memória do publicador. Não é necessário listar o bucket: as contas
+continuam restritas aos objetos do prefixo de cada app. O `gcloud storage cp`
+não é usado para publicação porque tenta listar destinos inexistentes para
+distinguir objetos de pastas e falha com essas permissões restritas.
+
+Referência: [Cloud Storage objects.insert](https://docs.cloud.google.com/storage/docs/json_api/v1/objects/insert).
