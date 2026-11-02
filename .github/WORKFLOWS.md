@@ -163,4 +163,4 @@ bash -n .github/scripts/run-android-tests.sh
 ```
 
 These checks neither execute the Cloud Run Job nor contact the API. To run the
-Android suite locally, continue using the Flutter commands in the main README.
+Android suites locally, see the [testing guide](../docs/testing.md).
