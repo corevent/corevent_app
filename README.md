@@ -55,3 +55,5 @@ Configure a assinatura Android antes de distribuir uma versão de release.
 - [Testes Android, E2E e ambientes](docs/testing.md)
 - [Política de cobertura](docs/test-coverage.md)
 - [GitHub Actions, staging e assinatura de release](.github/WORKFLOWS.md)
+
+Consulte o [guia de publicação de APKs nos buckets](docs/apk-publishing.md).

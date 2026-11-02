@@ -1,26 +1,27 @@
+> Publicação nos buckets e assinatura de staging: [guia de APKs](../docs/apk-publishing.md).
+
 # GitHub Actions
 
 ## Workflows
 
 - **Development APK** (`workflows/development-apk.yml`): runs on pushes to
   `develop` and manual dispatch on that branch. Generates code, runs analysis
-  and unit/widget tests, builds a debug APK with the `development` flavor,
+  and unit/widget tests, builds a signed release APK with the `development` flavor,
   then publishes a GitHub pre-release with the APK and its SHA-256 checksum.
-  It uses `COREVENT_API_URL` from the `staging` Environment and requires no
-  signing secrets or GCP authentication. The `.development` application ID
+  It uses `COREVENT_API_URL` from the `staging` Environment and uses staging signing secrets and GCP Workload Identity Federation. The `.development` application ID
   keeps its installation and session separate from production and integration.
   Each run creates a `dev-RUN-ATTEMPT` tag; production releases remain unchanged.
   Download `corevent-development.apk` from **Releases**. Android integration
   remains in the Tests workflow; this publication does not wait for that workflow.
-  GitHub runners generate debug signing keys, so installing another build can
-  require uninstalling the previous development app, which clears its local data.
+  Staging uses a fixed signing key configured in its Environment. Migrating from
+  a previous debug-signed APK requires reinstalling once.
 - **Release APK** (`workflows/release-apk.yml`): manual dispatch on `main`, using
   the `production` Environment. Checks formatting, generated code, analysis,
   unit/widget/contract tests and CI helpers. Builds a universal production APK
   with the configured release key and the supplied Android versionCode.
   Verifies the signature, application ID, versionCode and INTERNET permission,
   then uploads the APK, SHA-256 checksum and public signature/build metadata
-  as an Actions artifact for 30 days. No emulator, GCP or API preparation is used.
+  as an Actions artifact for 30 days. GCP authentication publishes the same APK to its private bucket. No emulator or API preparation is used.
   Signing files are temporary and removed even on failure.
 - **Tests** (`workflows/tests.yml`): runs on pull requests, pushes to `main` or
   `develop`, and manual dispatch. Checks formatting, generation, analysis, unit,
