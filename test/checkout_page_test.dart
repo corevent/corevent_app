@@ -20,7 +20,7 @@ class MockPendingStore extends Mock implements PendingCheckoutStore {}
 
 class MockSession extends Mock implements AuthSession {}
 
-CheckoutCatalog catalog() {
+CheckoutCatalog catalog({bool adultOnly = false}) {
   final now = DateTime.now();
   return CheckoutCatalog(
     EventDetail(
@@ -29,7 +29,7 @@ CheckoutCatalog catalog() {
       startDate: now.add(const Duration(days: 2)),
       endDate: now.add(const Duration(days: 2, hours: 3)),
       category: 'music',
-      isAdultOnly: false,
+      isAdultOnly: adultOnly,
       locationName: 'Arena',
       organizer: const EventOrganizer(name: 'Organizador'),
       status: 'opened',
@@ -149,6 +149,39 @@ void main() {
           .onPressed,
       isNull,
     );
+  });
+
+  testWidgets('Continuar exibe política +18 e só cria pedido após aceite', (
+    tester,
+  ) async {
+    const policy = AgePolicy('p1', 'Termos de idade', 1);
+    when(() => repository.catalog('e1'))
+        .thenAnswer((_) async => catalog(adultOnly: true));
+    when(() => repository.agePolicyStatus())
+        .thenAnswer((_) async => (policy: policy, accepted: false));
+    when(() => repository.requiredAgePolicy()).thenAnswer((_) async => policy);
+    when(() => repository.acceptAgePolicy()).thenAnswer((_) async {});
+    when(() => repository.create('e1', {'paid': 1}))
+        .thenAnswer((_) async => const CreatedOrder('o1', [], []));
+    await show(tester);
+    expect(find.textContaining('você precisa ler e aceitar'), findsOneWidget);
+    await tester.tap(find.byTooltip('Adicionar Inteira'));
+    await tester.pump();
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirmação de idade'), findsOneWidget);
+    expect(find.text('Termos de idade'), findsOneWidget);
+    verifyNever(() => repository.create(any(), any()));
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    verifyNever(() => repository.acceptAgePolicy());
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Li e aceito'));
+    await tester.pumpAndSettle();
+    expect(find.text('Status o1'), findsOneWidget);
+    verify(() => repository.acceptAgePolicy()).called(1);
+    verify(() => repository.create('e1', {'paid': 1})).called(1);
   });
 
   testWidgets('envio bloqueia seleção e navega ao status uma única vez', (

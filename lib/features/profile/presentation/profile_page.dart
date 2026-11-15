@@ -174,6 +174,12 @@ class ProfilePage extends ConsumerWidget {
                   ]),
                   _Group('Minha conta', [
                     _RowData(
+                      RemixIcons.shield_check_line,
+                      'Política de idade',
+                      'Consulte, aceite ou revogue a política para eventos +18',
+                      '/profile/age-policy',
+                    ),
+                    _RowData(
                       RemixIcons.user_line,
                       'Dados pessoais',
                       null,

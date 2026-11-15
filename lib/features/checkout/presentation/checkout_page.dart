@@ -7,6 +7,7 @@ import 'package:remixicon/remixicon.dart';
 import '../../../core/design_system/app_surfaces.dart';
 import '../../../core/design_system/corevent_button.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../profile/presentation/age_policy_page.dart';
 import '../data/checkout_dtos.dart';
 import 'checkout_view_model.dart';
 
@@ -53,7 +54,10 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
           ],
         ),
       );
-      if (accepted == true) await model.acceptAndSubmit();
+      if (accepted == true) {
+        await model.acceptAndSubmit();
+        if (mounted) ref.invalidate(agePolicyStatusProvider);
+      }
     }
     if (!mounted) return;
     final order = ref.read(checkoutViewModelProvider).order;
@@ -99,6 +103,8 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                           padding: const EdgeInsets.all(20),
                           children: [
                             if (state.event != null) ...[
+                              if (state.event!.isAdultOnly)
+                                const AgePolicyNotice(),
                               Text(
                                 state.event!.title,
                                 style: Theme.of(context).textTheme.titleLarge
