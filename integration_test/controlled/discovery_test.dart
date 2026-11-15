@@ -25,9 +25,10 @@ void main() {
     final container = await openApp(tester, backend);
     await tapFixture(tester, find.text('Explorar').last);
     await tester.pumpAndSettle();
+    await waitForFixtureText(tester, 'Festival de integração');
     await enterFixtureText(tester, find.byType(TextField).first, 'Festival');
     await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
+    await waitForFixtureText(tester, 'Festival de integração');
     expect(
       backend.requests.any(
         (request) =>
@@ -75,17 +76,19 @@ void main() {
     final container = await openApp(tester, backend);
     await tapFixture(tester, find.text('Explorar').last);
     await tester.pumpAndSettle();
+    await waitForFixtureText(tester, 'Festival de integração');
     await tester.ensureVisible(find.text('Festival de integração').last);
     await tapFixture(tester, find.text('Festival de integração').last);
-    await tester.pumpAndSettle();
+    await waitForFixtureText(tester, 'Favoritar');
     await tester.ensureVisible(find.text('Favoritar').last);
     await tapFixture(tester, find.text('Favoritar').last);
-    await tester.pumpAndSettle();
+    await waitForFixtureText(tester, 'Favoritado');
     expect(backend.favoriteSaved, isTrue);
     await tapFixture(tester, find.byTooltip('Fechar prévia'));
     await tester.pumpAndSettle();
     container.read(routerProvider).go('/profile/favorites');
     await tester.pumpAndSettle();
+    await waitForFixtureText(tester, 'Festival de integração');
     expect(find.text('Festival de integração'), findsWidgets);
     backend.expectOnlySupportedRequests();
     await closeApp(tester, container);

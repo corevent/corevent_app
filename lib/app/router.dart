@@ -27,6 +27,7 @@ import '../features/home/presentation/home_page.dart';
 import '../features/home/presentation/home_view_model.dart';
 import '../features/profile/presentation/activity_pages.dart';
 import '../features/profile/presentation/activity_view_model.dart';
+import '../features/profile/presentation/age_policy_page.dart';
 import '../features/profile/presentation/avatar_view_model.dart';
 import '../features/profile/presentation/profile_details_page.dart';
 import '../features/profile/presentation/profile_form_pages.dart';
@@ -59,6 +60,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     ref.invalidate(avatarViewModelProvider);
     ref.invalidate(securityViewModelProvider);
     ref.invalidate(checkoutViewModelProvider);
+    ref.invalidate(agePolicyStatusProvider);
   }
 
   session.addListener(clearPrivateState);
@@ -250,6 +252,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/profile/security',
         name: 'profileSecurity',
         builder: (_, _) => const ProfileSecurityPage(),
+      ),
+      GoRoute(
+        path: '/profile/age-policy',
+        name: 'profileAgePolicy',
+        builder: (_, _) => const AgePolicyPage(),
       ),
       GoRoute(
         path: '/profile/orders',

@@ -7,6 +7,7 @@ import '../../../core/design_system/corevent_button.dart';
 import '../../../core/design_system/icon_label.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../favorites/presentation/event_favorite_button.dart';
+import '../../profile/presentation/age_policy_page.dart';
 import '../../ratings/data/rating_dtos.dart';
 import '../../ratings/presentation/event_ratings_view_model.dart';
 import '../../ratings/presentation/rating_widgets.dart';
@@ -153,6 +154,10 @@ class _EventPreviewSheetState extends ConsumerState<_EventPreviewSheet> {
                         withLabel: true,
                       ),
                     ),
+                    if (loaded?.isAdultOnly ?? summary.isAdultOnly) ...[
+                      const SizedBox(height: 12),
+                      const AgePolicyNotice(),
+                    ],
                     const SizedBox(height: 12),
                     _PreviewLine(
                       RemixIcons.calendar_event_line,
