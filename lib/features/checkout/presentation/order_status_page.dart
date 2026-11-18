@@ -134,6 +134,7 @@ class _OrderStatusPageState extends ConsumerState<OrderStatusPage>
 
   @override
   Widget build(BuildContext context) {
+    final canGoBack = ModalRoute.canPopOf(context) ?? false;
     final order = _order;
     final status = order?.status.toLowerCase();
     final payment =
@@ -157,15 +158,17 @@ class _OrderStatusPageState extends ConsumerState<OrderStatusPage>
             .whereType<Uri>()
             .where((url) => url.scheme == 'https')
             .firstOrNull;
-    return Scaffold(
+    final page = Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         shape: const Border(bottom: AppSurfaces.outline),
         title: const Text('Seu pedido'),
         leading: IconButton(
-          tooltip: 'Voltar aos pedidos',
-          onPressed: () => context.go('/profile/orders'),
+          tooltip: canGoBack ? 'Voltar' : 'Voltar aos pedidos',
+          onPressed: canGoBack
+              ? () => context.pop()
+              : () => context.go('/profile/orders'),
           icon: const Icon(RemixIcons.arrow_left_line),
         ),
       ),
@@ -312,6 +315,13 @@ class _OrderStatusPageState extends ConsumerState<OrderStatusPage>
           ),
         ),
       ),
+    );
+    return PopScope(
+      canPop: canGoBack,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !canGoBack) context.go('/profile/orders');
+      },
+      child: page,
     );
   }
 }
