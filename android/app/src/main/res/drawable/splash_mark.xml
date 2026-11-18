@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="96dp"
-    android:height="96dp"
-    android:viewportWidth="96"
-    android:viewportHeight="96">
-    <path
-        android:fillColor="#18181A"
-        android:pathData="M65,27 C59,21 53,19 45,19 C28,19 17,32 17,48 C17,65 28,77 45,77 C53,77 60,74 66,68 L58,59 C54,63 50,65 45,65 C35,65 29,58 29,48 C29,38 35,31 45,31 C50,31 54,33 58,37 Z" />
-    <path
-        android:fillColor="#FF5A36"
-        android:pathData="M78,48 C78,53 74,57 69,57 C64,57 60,53 60,48 C60,43 64,39 69,39 C74,39 78,43 78,48 Z" />
-</vector>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Android 12+ uses a 288dp icon canvas for a splash without an icon background. -->
+    <item
+        android:width="288dp"
+        android:height="288dp"
+        android:gravity="center"
+        android:drawable="@android:color/transparent" />
+    <item
+        android:width="112dp"
+        android:height="112dp"
+        android:gravity="center"
+        android:drawable="@drawable/brand_mark" />
+</layer-list>
