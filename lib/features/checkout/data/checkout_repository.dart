@@ -51,6 +51,14 @@ class CheckoutRepository {
   }
 
   Future<void> acceptAgePolicy() => api.acceptAgePolicy();
+
+  Future<({AgePolicy policy, bool accepted})> agePolicyStatus() async {
+    final policy = (await api.agePolicy()).data;
+    final accepted = (await api.checkAgeAcceptance()).data.userHasAccepted;
+    return (policy: policy, accepted: accepted);
+  }
+
+  Future<void> revokeAgePolicy() => api.revokeAgePolicy();
 }
 
 class PendingCheckoutStore {

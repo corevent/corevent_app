@@ -31,4 +31,7 @@ abstract class CheckoutApi {
 
   @POST('/api/age-policies/acceptances')
   Future<void> acceptAgePolicy();
+
+  @DELETE('/api/age-policies/acceptances')
+  Future<void> revokeAgePolicy();
 }

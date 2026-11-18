@@ -203,16 +203,20 @@ void main() {
     expect(find.text('Olá, Ana!'), findsOneWidget);
     await tester.tap(find.byTooltip('Abrir perfil'));
     await tester.pumpAndSettle();
+    final logoutButton = find.widgetWithText(OutlinedButton, 'Sair da conta');
     await tester.scrollUntilVisible(
-      find.text('Sair da conta'),
+      logoutButton,
       200,
       scrollable: find.descendant(
         of: find.byType(ProfilePage),
         matching: find.byType(Scrollable),
       ),
     );
-    await tester.tap(find.text('Sair da conta'));
     await tester.pumpAndSettle();
+    expect(logoutButton.hitTestable(), findsOneWidget);
+    await tester.tap(logoutButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Sair da conta?'), findsOneWidget);
     await tester.tap(find.text('Sair').last);
     await tester.pumpAndSettle();
     expect(find.textContaining('eventos incríveis'), findsOneWidget);
