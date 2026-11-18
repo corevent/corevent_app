@@ -108,6 +108,18 @@ void main() {
     expect(find.text('Ver meus ingressos'), findsNothing);
   });
 
+  testWidgets('Voltar em uma confirmação aberta direto mostra os pedidos', (
+    tester,
+  ) async {
+    when(() => activity.order('o1')).thenAnswer((_) async => order('paid'));
+    await show(tester);
+    expect(find.text('Pedido confirmado'), findsOneWidget);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Pedidos'), findsOneWidget);
+  });
+
   testWidgets(
     'falha na consulta permite retry e só libera ingressos após pago',
     (tester) async {

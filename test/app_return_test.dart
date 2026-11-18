@@ -102,6 +102,25 @@ void main() {
     verify(() => pending.read('u1')).called(1);
   });
 
+  testWidgets('retorno do pagamento preserva o histórico do pedido aberto', (
+    tester,
+  ) async {
+    session.authenticate();
+    when(() => pending.read('u1')).thenAnswer((_) async => 'order-1');
+    await show(tester);
+    unawaited(router.push('/orders/order-1/status'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pedido order-1'), findsOneWidget);
+
+    links.add(Uri.parse('corevent://orders'));
+    await tester.pumpAndSettle();
+    verify(() => pending.read('u1')).called(1);
+    expect(find.text('Pedido order-1'), findsOneWidget);
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Início'), findsOneWidget);
+  });
+
   testWidgets('retorno sem pedido pendente abre a lista', (tester) async {
     session.authenticate();
     when(() => pending.read('u1')).thenAnswer((_) async => null);

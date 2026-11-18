@@ -73,9 +73,16 @@ class _CoreventAppState extends ConsumerState<CoreventApp> {
     _pendingOrderReturn = false;
     final orderId = await ref.read(pendingCheckoutStoreProvider).read(userId);
     if (!mounted) return;
-    ref
-        .read(routerProvider)
-        .go(orderId == null ? '/profile/orders' : '/orders/$orderId/status');
+    final router = ref.read(routerProvider);
+    final destination = orderId == null
+        ? '/profile/orders'
+        : '/orders/$orderId/status';
+    if (orderId != null &&
+        router.canPop() &&
+        router.state.uri.path == destination) {
+      return;
+    }
+    router.go(destination);
   }
 
   @override
