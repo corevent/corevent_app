@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/corevent_background" />
-    <item android:drawable="@drawable/splash_mark" android:gravity="center" />
+    <item
+        android:width="112dp"
+        android:height="112dp"
+        android:gravity="center"
+        android:drawable="@drawable/brand_mark" />
 </layer-list>

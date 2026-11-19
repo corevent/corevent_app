@@ -62,7 +62,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     if (!mounted) return;
     final order = ref.read(checkoutViewModelProvider).order;
     if (order != null) {
-      context.go('/orders/${order.orderId}/status', extra: order);
+      context.pushReplacement('/orders/${order.orderId}/status', extra: order);
     }
   }
 

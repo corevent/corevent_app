@@ -20,7 +20,7 @@ class MockPendingStore extends Mock implements PendingCheckoutStore {}
 
 class MockSession extends Mock implements AuthSession {}
 
-CheckoutCatalog catalog({bool adultOnly = false}) {
+CheckoutCatalog catalog({bool adultOnly = false, double price = 25}) {
   final now = DateTime.now();
   return CheckoutCatalog(
     EventDetail(
@@ -38,7 +38,7 @@ CheckoutCatalog catalog({bool adultOnly = false}) {
       CheckoutTicketType(
         id: 'paid',
         name: 'Inteira',
-        price: 25,
+        price: price,
         availableQuantity: 2,
         startDate: now.subtract(const Duration(days: 1)),
         endDate: now.add(const Duration(days: 1)),
@@ -231,6 +231,42 @@ void main() {
     expect(find.text('Continuar'), findsNothing);
     verify(() => repository.create('e1', {'paid': 1})).called(1);
   });
+
+  for (final free in [true, false]) {
+    testWidgets(
+      'Voltar após pedido ${free ? 'gratuito' : 'pago'} retorna à origem',
+      (tester) async {
+        when(() => repository.catalog('e1'))
+            .thenAnswer((_) async => catalog(price: free ? 0 : 25));
+        when(() => repository.create('e1', {'paid': 1})).thenAnswer(
+          (_) async => CreatedOrder('o1', [
+            if (!free)
+              const CheckoutPaymentLink(
+                'PAY',
+                'https://payment.example',
+                'GET',
+              ),
+          ], []),
+        );
+        await show(tester);
+        appRouter.go('/home');
+        await tester.pumpAndSettle();
+        unawaited(appRouter.push('/checkout'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Adicionar Inteira'));
+        await tester.pump();
+        await tester.tap(find.text('Continuar'));
+        await tester.pumpAndSettle();
+        expect(find.text('Status o1'), findsOneWidget);
+
+        expect(await tester.binding.handlePopRoute(), isTrue);
+        await tester.pumpAndSettle();
+        expect(find.text('Início'), findsOneWidget);
+        expect(find.text('Escolher ingressos'), findsNothing);
+        verify(() => repository.create('e1', {'paid': 1})).called(1);
+      },
+    );
+  }
 
   for (final scale in [1.5, 2.0]) {
     testWidgets('layout de checkout rola em 360px com fonte $scale', (
